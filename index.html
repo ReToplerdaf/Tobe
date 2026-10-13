@@ -1,0 +1,649 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Тетрадь To Be</title>
+<style>
+/* Layout: одна тетрадная страница в клетку с красной линией полей; задание сверху, проверка «красной ручкой» под ним, журнал и карта слабых мест ниже */
+:root {
+  --paper: #f6f8fc;
+  --sheet: #fbfcfe;
+  --grid: #dfe7f2;
+  --margin: #eba7a7;
+  --text: #18202e;
+  --muted: #5d687c;
+  --ink: #2346a8;
+  --ink-soft: #e3eafb;
+  --pen: #cf2f27;
+  --pen-soft: #fbe6e4;
+  --ok: #1d8048;
+  --ok-soft: #e1f3e8;
+  --warn: #b7791f;
+  --q: #7a3fb8;
+  --q-soft: #efe6fa;
+  --line: #cfd8e6;
+  --font-body: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-hand: "Segoe Print", "Bradley Hand", "Noteworthy", "Comic Sans MS", system-ui, sans-serif;
+  --cell: 22px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0f1420; --sheet: #141b2a; --grid: #1e293c; --margin: #5b2e36;
+    --text: #e5eaf4; --muted: #8e9ab0; --ink: #93b3ff; --ink-soft: #1c2a4a;
+    --pen: #ff7b70; --pen-soft: #3a1f22; --ok: #5bd08f; --ok-soft: #173426;
+    --warn: #e6b35a; --line: #2a3650; --q: #c39bff; --q-soft: #2a2140; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0f1420; --sheet: #141b2a; --grid: #1e293c; --margin: #5b2e36;
+  --text: #e5eaf4; --muted: #8e9ab0; --ink: #93b3ff; --ink-soft: #1c2a4a;
+  --pen: #ff7b70; --pen-soft: #3a1f22; --ok: #5bd08f; --ok-soft: #173426;
+  --warn: #e6b35a; --line: #2a3650; --q: #c39bff; --q-soft: #2a2140; color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+img { max-width: 100%; }
+body { margin: 0; }
+body {
+  background: var(--paper);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
+  padding: 24px 16px 48px;
+}
+.wrap { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+
+header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 20px; }
+.brand h1 { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.01em; text-wrap: balance; }
+.brand h1 .hand { font-family: var(--font-hand); color: var(--ink); font-size: 36px; font-weight: 700; margin-left: 4px; }
+.brand p { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
+.score { display: flex; gap: 16px; font-variant-numeric: tabular-nums; }
+.score div { display: flex; flex-direction: column; align-items: flex-end; }
+.score b { font-size: 22px; line-height: 1.1; }
+.score span { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+
+.modes { display: flex; flex-wrap: wrap; gap: 8px; }
+.modes button {
+  font: inherit; font-size: 14px; font-weight: 500;
+  padding: 7px 14px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--sheet); color: var(--text);
+}
+.modes button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--sheet); }
+.modes button:focus-visible, .btn:focus-visible, .answer:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+/* Тетрадный лист */
+.sheet {
+  position: relative;
+  background-color: var(--sheet);
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: var(--cell) var(--cell);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 22px 22px 22px 58px;
+}
+.sheet::before {
+  content: ""; position: absolute; top: 0; bottom: 0; left: 40px;
+  width: 2px; background: var(--margin);
+}
+.task-meta { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+/* Тип предложения: у каждого свой цвет */
+.sheet { --tagc: var(--ink); --tagbg: var(--ink-soft); box-shadow: inset 0 5px 0 var(--tagc); }
+.sheet.m-neg { --tagc: var(--pen); --tagbg: var(--pen-soft); }
+.sheet.m-q { --tagc: var(--q); --tagbg: var(--q-soft); }
+.tag {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 15px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 4px 14px 4px 4px; border-radius: 999px;
+  background: var(--tagbg); color: var(--tagc);
+}
+.tag .sign {
+  display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
+  background: var(--tagc); color: var(--sheet); font-size: 18px; line-height: 1;
+}
+.neg-word { color: var(--pen); font-weight: 700; text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; }
+.sheet.m-neg .answer { border-bottom-color: var(--pen); }
+.num { position: absolute; left: 10px; top: 20px; width: 26px; text-align: right; font-family: var(--font-hand); font-size: 22px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.repeat { font-size: 12px; color: var(--warn); font-weight: 600; }
+
+.sentence {
+  margin: 14px 0 6px;
+  font-size: clamp(22px, 5vw, 30px);
+  font-weight: 500;
+  line-height: 1.6;
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 0.35em;
+}
+.answer {
+  font: inherit; font-family: var(--font-hand); font-weight: 700;
+  font-size: 1.25em; color: var(--ink);
+  width: 6.5ch; min-width: 4ch; max-width: 100%;
+  padding: 0 4px; margin: 0;
+  border: 0; border-bottom: 2px solid var(--ink);
+  background: var(--ink-soft); border-radius: 4px 4px 0 0;
+  text-align: center;
+}
+.answer::placeholder { color: var(--muted); opacity: 0.5; }
+
+.actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 14px; }
+.btn {
+  font: inherit; font-size: 15px; font-weight: 600; cursor: pointer;
+  padding: 9px 18px; border-radius: 8px; border: 1px solid var(--ink);
+  background: var(--ink); color: var(--sheet);
+}
+.btn.ghost { background: transparent; color: var(--ink); }
+.btn.quiet { background: transparent; color: var(--muted); border-color: var(--line); }
+.hint-ru { font-size: 15px; color: var(--muted); }
+.hint-ru[hidden] { display: none; }
+.kbd { font-size: 12px; color: var(--muted); margin-left: auto; }
+
+/* Проверка «красной ручкой» */
+.check { border-radius: 6px; padding: 16px 18px; border: 1px solid var(--line); background: var(--sheet); display: grid; gap: 6px; }
+.check.ok { border-color: var(--ok); background: var(--ok-soft); }
+.check.bad { border-color: var(--pen); background: var(--pen-soft); }
+.verdict { font-family: var(--font-hand); font-size: 30px; font-weight: 700; line-height: 1; }
+.check.ok .verdict { color: var(--ok); }
+.check.bad .verdict { color: var(--pen); }
+.given s { color: var(--pen); text-decoration-thickness: 2px; }
+.full { font-size: 19px; font-weight: 500; }
+.full mark { background: none; color: var(--ok); font-weight: 700; }
+.check.bad .full mark { color: var(--pen); }
+.rule { font-size: 14.5px; color: var(--text); }
+.rule b { color: var(--ink); }
+.ru { font-size: 16px; color: var(--muted); display: flex; gap: 8px; align-items: baseline; }
+.ru .flag { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; padding: 1px 6px; border-radius: 4px; border: 1px solid var(--line); color: var(--muted); }
+.note { font-size: 13px; color: var(--warn); }
+
+.panel { background: var(--sheet); border: 1px solid var(--line); border-radius: 6px; padding: 16px 18px; min-width: 0; }
+.panel h2 { margin: 0 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
+
+
+table.map { width: 100%; border-collapse: separate; border-spacing: 4px; font-variant-numeric: tabular-nums; }
+.map th { font-size: 12px; font-weight: 600; color: var(--muted); text-align: center; padding: 2px; }
+.map th.row { text-align: left; font-size: 15px; color: var(--text); }
+.map td { text-align: center; border-radius: 6px; padding: 8px 2px; font-size: 14px; font-weight: 600; border: 1px solid var(--line); }
+.map td small { display: block; font-size: 11px; font-weight: 400; color: var(--muted); }
+.map td.lv0 { color: var(--muted); }
+.map td.lv1 { background: var(--ok-soft); color: var(--ok); border-color: transparent; }
+.map td.lv2 { background: color-mix(in srgb, var(--warn) 16%, var(--sheet)); color: var(--warn); border-color: transparent; }
+.map td.lv3 { background: var(--pen-soft); color: var(--pen); border-color: transparent; }
+.weak { margin: 10px 0 0; font-size: 14px; color: var(--muted); }
+.weak b { color: var(--text); font-weight: 600; }
+.reset-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 12px; font-size: 13px; color: var(--muted); }
+.reset-row .btn { font-size: 13px; padding: 5px 12px; }
+
+
+.levels { align-items: center; margin-top: -8px; }
+.lvl-label { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-right: 2px; }
+.levels button[aria-pressed="true"] { background: var(--ink-soft); border-color: var(--ink); color: var(--ink); }
+.ru-prompt { flex-basis: 100%; }
+.answer.wide {
+  flex-basis: 100%; width: 100%; margin-top: 10px; text-align: left;
+  font-family: var(--font-body); font-weight: 500; font-size: 0.8em;
+  padding: 6px 10px; border-radius: 6px 6px 0 0;
+}
+
+/* Телефон */
+@media (max-width: 640px) {
+  body { padding: 12px 16px 32px; }
+  .wrap { gap: 14px; }
+  header { align-items: center; flex-wrap: nowrap; }
+  .brand h1 { font-size: 20px; }
+  .brand h1 .hand { font-size: 28px; }
+  .brand p { display: none; }
+  .score { gap: 12px; }
+  .score b { font-size: 18px; }
+  .score span { font-size: 10px; }
+  .modes { flex-wrap: nowrap; overflow-x: auto; margin: 0 -16px; padding: 0 16px 2px; scrollbar-width: none; }
+  .modes::-webkit-scrollbar { display: none; }
+  .modes button { flex: none; padding: 9px 14px; }
+  .sheet { padding: 16px 14px 16px 42px; --cell: 20px; }
+  .sheet::before { left: 30px; }
+  .num { left: 0; top: 14px; width: 24px; font-size: 20px; }
+  .sentence { font-size: 22px; margin: 10px 0 4px; }
+  .answer { font-size: 26px; min-height: 44px; }
+  .answer.wide { font-size: 18px; }
+  .levels { margin-top: -6px; }
+  .actions { gap: 8px; }
+  .actions .btn { flex: 1 1 0; padding: 12px 10px; font-size: 16px; }
+  .hint-ru { flex-basis: 100%; order: 3; }
+  .kbd { display: none; }
+  .check { padding: 14px; gap: 4px; }
+  .verdict { font-size: 26px; }
+  .full { font-size: 17px; }
+  .rule, .ru { font-size: 14.5px; }
+  .panel { padding: 14px; }
+  .map td { padding: 7px 2px; font-size: 13px; }
+  .reset-row .btn { padding: 8px 12px; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .check { animation: drop 0.22s ease-out; }
+  @keyframes drop { from { transform: translateY(-4px); opacity: 0.4; } to { transform: none; opacity: 1; } }
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <h1>Глагол <span class="hand">to be</span></h1>
+      <p id="lead">Впиши am / is / are в пропуск. Ошибки вернутся чуть позже.</p>
+    </div>
+    <div class="score">
+      <div><b id="sScore">0/0</b><span>верно</span></div>
+      <div><b id="sStreak">0</b><span>серия</span></div>
+    </div>
+  </header>
+
+  <nav class="modes" id="modes" aria-label="Режим">
+    <button type="button" data-mode="all" aria-pressed="true">Всё вперемешку</button>
+    <button type="button" data-mode="pos" aria-pressed="false">am · is · are</button>
+    <button type="button" data-mode="neg" aria-pressed="false">Отрицание</button>
+    <button type="button" data-mode="q" aria-pressed="false">Вопросы</button>
+  </nav>
+
+  <nav class="modes levels" id="levels" aria-label="Сложность">
+    <span class="lvl-label">Сложность</span>
+    <button type="button" data-level="1" aria-pressed="true">1 · вставить слово</button>
+    <button type="button" data-level="2" aria-pressed="false">2 · перевести с русского</button>
+  </nav>
+
+  <form class="sheet" id="taskForm" autocomplete="off">
+    <div class="num" id="tNum">1</div>
+    <div class="task-meta">
+      <div class="tag" id="tTag"><span class="sign">+</span>утверждение</div>
+      <div class="repeat" id="tRepeat" hidden>повтор ошибки</div>
+    </div>
+    <div class="sentence" id="tSentence"></div>
+    <div class="actions">
+      <button class="btn" type="submit">Проверить</button>
+      <button class="btn ghost" type="button" id="hintBtn">Перевод</button>
+      <span class="hint-ru" id="hintRu" hidden></span>
+      <span class="kbd">Enter — проверить</span>
+    </div>
+  </form>
+
+  <section class="check" id="check" hidden aria-live="polite"></section>
+
+  <div class="stats">
+    <section class="panel">
+      <h2>Где ошибаешься</h2>
+      <table class="map" id="map"></table>
+      <p class="weak" id="weak"></p>
+      <div class="reset-row">
+        <button class="btn quiet" type="button" id="resetBtn">Сбросить статистику</button>
+        <span id="resetConfirm" hidden>Точно? <button class="btn ghost" type="button" id="resetYes">Да, сбросить</button> <button class="btn quiet" type="button" id="resetNo">Отмена</button></span>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+(() => {
+  // ---------- Данные ----------
+  // Русские формы: 0 м.р., 1 ж.р., 2 ср.р., 3 мн.ч.
+  const P = 1, A = 2, T = 4, W = 8, S = 16, IT = 32;
+  const S_ = (en, ru, dat, verb, kind, form, pl, pron) => ({ en, ru, dat, verb, kind, form, pl, pron });
+  const subjects = [
+    S_("I", "Я", "Мне", "am", P, 0, false, "I"),
+    S_("You", "Вы", "Вам", "are", P, 3, false, "you"),
+    S_("He", "Он", "Ему", "is", P, 0, false, "he"),
+    S_("She", "Она", "Ей", "is", P, 1, false, "she"),
+    S_("We", "Мы", "Нам", "are", P, 3, true, "we"),
+    S_("They", "Они", "Им", "are", P, 3, true, "they"),
+    S_("My friend", "Мой друг", "Моему другу", "is", P, 0, false, "he"),
+    S_("My sister", "Моя сестра", "Моей сестре", "is", P, 1, false, "she"),
+    S_("Dad", "Папа", "Папе", "is", P, 0, false, "he"),
+    S_("Mum", "Мама", "Маме", "is", P, 1, false, "she"),
+    S_("John", "Джон", "Джону", "is", P, 0, false, "he"),
+    S_("Mary", "Мэри", "Мэри", "is", P, 1, false, "she"),
+    S_("John and Mary", "Джон и Мэри", "Джону и Мэри", "are", P, 3, true, "they"),
+    S_("My mum and dad", "Мои мама и папа", "Моим маме и папе", "are", P, 3, true, "they"),
+    S_("The children", "Дети", "Детям", "are", P, 3, true, "they"),
+    S_("Tom and I", "Мы с Томом", "Нам с Томом", "are", P, 3, true, "we"),
+    S_("The cat", "Кошка", "", "is", A, 1, false, "it"),
+    S_("The dog", "Собака", "", "is", A, 1, false, "it"),
+    S_("The dogs", "Собаки", "", "are", A, 3, true, "they"),
+    S_("The book", "Книга", "", "is", T, 1, false, "it"),
+    S_("This TV", "Этот телевизор", "", "is", T, 0, false, "it"),
+    S_("The car", "Машина", "", "is", T, 1, false, "it"),
+    S_("These phones", "Эти телефоны", "", "are", T, 3, true, "they"),
+    S_("The weather", "Погода", "", "is", W, 1, false, "it"),
+    S_("This shop", "Этот магазин", "", "is", S, 0, false, "it"),
+    S_("The shops", "Магазины", "", "are", S, 3, true, "they"),
+    S_("It", "Это", "", "is", IT, 2, false, "it"),
+  ];
+  const same = s => [s, s, s, s];
+  const adj = (m, f, n, pl) => [m, f, n, pl];
+  const noun = (m, f, pl) => [m, f, m, pl];
+  const C = (kinds, sg, pl, ru, age = false) => ({ kinds, sg, pl, ru, age });
+  const complements = [
+    C(P|A, "hungry", "hungry", adj("голоден", "голодна", "голодно", "голодны")),
+    C(P|A, "happy", "happy", adj("счастлив", "счастлива", "счастливо", "счастливы")),
+    C(P|A, "tired", "tired", adj("устал", "устала", "устало", "устали")),
+    C(P, "sad", "sad", adj("грустный", "грустная", "грустное", "грустные")),
+    C(P, "busy", "busy", adj("занят", "занята", "занято", "заняты")),
+    C(P|A, "ill", "ill", adj("болен", "больна", "больно", "больны")),
+    C(P|A, "at home", "at home", same("дома")),
+    C(P, "in the gym", "in the gym", same("в спортзале")),
+    C(P|A, "in the park", "in the park", same("в парке")),
+    C(P|A, "in the garden", "in the garden", same("в саду")),
+    C(P, "at school", "at school", same("в школе")),
+    C(P, "at work", "at work", same("на работе")),
+    C(P, "in London", "in London", same("в Лондоне")),
+    C(P, "from England", "from England", same("из Англии")),
+    C(P, "from Russia", "from Russia", same("из России")),
+    C(A|T, "under the table", "under the table", same("под столом")),
+    C(P|A|T, "in the kitchen", "in the kitchen", same("на кухне")),
+    C(A|T, "on the sofa", "on the sofa", same("на диване")),
+    C(P, "a doctor", "doctors", noun("врач", "врач", "врачи")),
+    C(P, "a teacher", "teachers", noun("учитель", "учительница", "учителя")),
+    C(P, "a student", "students", noun("студент", "студентка", "студенты")),
+    C(P, "a singer", "singers", noun("певец", "певица", "певцы")),
+    C(P, "a pupil", "pupils", noun("ученик", "ученица", "ученики")),
+    C(P, "a good friend", "good friends", noun("хороший друг", "хорошая подруга", "хорошие друзья")),
+    C(P, "a pilot", "pilots", noun("пилот", "пилот", "пилоты")),
+    C(P, "{n} years old", "{n} years old", same(""), true),
+    C(A|T, "big", "big", adj("большой", "большая", "большое", "большие")),
+    C(A|T, "small", "small", adj("маленький", "маленькая", "маленькое", "маленькие")),
+    C(T, "new", "new", adj("новый", "новая", "новое", "новые")),
+    C(T, "old", "old", adj("старый", "старая", "старое", "старые")),
+    C(T, "expensive", "expensive", adj("дорогой", "дорогая", "дорогое", "дорогие")),
+    C(T, "interesting", "interesting", adj("интересный", "интересная", "интересное", "интересные")),
+    C(A, "black", "black", adj("чёрный", "чёрная", "чёрное", "чёрные")),
+    C(W, "nice today", "nice today", same("хорошая сегодня")),
+    C(W, "cold today", "cold today", same("холодная сегодня")),
+    C(W, "sunny today", "sunny today", same("солнечная сегодня")),
+    C(W, "bad today", "bad today", same("плохая сегодня")),
+    C(S, "open today", "open today", adj("открыт сегодня", "открыта сегодня", "открыто сегодня", "открыты сегодня")),
+    C(S, "closed now", "closed now", adj("закрыт сейчас", "закрыта сейчас", "закрыто сейчас", "закрыты сейчас")),
+    C(IT, "an apple", "", same("яблоко")),
+    C(IT, "a book", "", same("книга")),
+    C(IT, "a pen", "", same("ручка")),
+    C(IT, "a ball", "", same("мяч")),
+    C(IT, "an orange", "", same("апельсин")),
+    C(IT, "my bag", "", same("моя сумка")),
+  ];
+  const MODES = { pos: "Positive", neg: "Negative", q: "Question" };
+  const MODE_LABEL = { pos: ["+", "утверждение"], neg: ["−", "отрицание"], q: ["?", "вопрос"] };
+  const PROPER = new Set(["I", "Dad", "Mum", "John", "Mary", "John and Mary", "Tom and I"]);
+
+  // ---------- Задание ----------
+  const cap = s => s[0].toUpperCase() + s.slice(1);
+  const compEn = t => (t.s.pl ? t.c.pl : t.c.sg).replace("{n}", t.age);
+  const subjQ = t => PROPER.has(t.s.en) ? t.s.en : t.s.en[0].toLowerCase() + t.s.en.slice(1);
+  const answers = t => {
+    if (t.mode === "neg") return { am: ["am not", "'m not"], is: ["isn't", "is not", "'s not"], are: ["aren't", "are not", "'re not"] }[t.s.verb];
+    return [t.s.verb];
+  };
+  const full = (t, a) => t.mode === "q"
+    ? `${cap(a)} ${subjQ(t)} ${compEn(t)}?`
+    : a.startsWith("'") ? `${t.s.en}${a} ${compEn(t)}.` : `${t.s.en} ${a} ${compEn(t)}.`;
+  const ru = t => {
+    const ne = t.mode === "neg" ? "не " : "";
+    const end = t.mode === "q" ? "?" : ".";
+    if (t.c.age) return `${t.s.dat} ${ne}${t.age} лет${end}`;
+    return `${t.s.ru} ${ne}${t.c.ru[t.s.form]}${end}`;
+  };
+  // Приводим ответ к общему виду: регистр, знаки препинания и сокращения не важны
+  const SYN = [
+    [/\b(mom|mother|mommy|mummy)\b/g, "mum"], [/\b(father|daddy|papa)\b/g, "dad"],
+    [/\bparents\b/g, "mum and dad"], [/\bmy mum and my dad\b/g, "my mum and dad"],
+    [/\bkids\b/g, "children"], [/\bsick\b/g, "ill"], [/\blarge\b/g, "big"], [/\blittle\b/g, "small"],
+    [/\bcouch\b/g, "sofa"], [/\b(good|fine) today\b/g, "nice today"], [/\bat gym\b/g, "in gym"],
+    [/\b(right now|at moment)\b/g, "now"], [/\b(i|me) and tom\b/g, "tom and i"], [/\btom and me\b/g, "tom and i"],
+    [/\b(this|that) is\b/g, "it is"], [/\bis (this|that)\b/g, "is it"],
+    [/\b(am|is|are)( not)? home\b/g, "$1$2 at home"], [/\ban\b/g, "a"],
+    [/\b(\d+) years? old\b/g, "$1"],
+  ];
+  const canon = s => {
+    s = s.toLowerCase().replace(/[’‘`´]/g, "'").replace(/[^a-z0-9'\s]/g, " ")
+      .replace(/\b(is|are)nt\b/g, "$1 not").replace(/n't\b/g, " not")
+      .replace(/'m\b/g, " am").replace(/'re\b/g, " are").replace(/'s\b/g, " is").replace(/'/g, "")
+      .replace(/\bthe\b/g, " ").replace(/\s+/g, " ").trim();
+    for (const [re, to] of SYN) s = s.replace(re, to);
+    return s.replace(/\s+/g, " ").trim();
+  };
+  const check = (t, input, lvl) => {
+    const a = canon(input);
+    if (lvl === 2) return a === canon(full(t, answers(t)[0]));
+    return answers(t).some(ans => a === canon(ans) || a === canon(full(t, ans)));
+  };
+  // Уровень 2: глагол стоит верно, а ошибка в других словах?
+  const verbRight = (t, input) => {
+    const a = " " + canon(input) + " ";
+    const hasVerb = a.includes(" " + canon(answers(t)[0]) + " ");
+    return hasVerb && /\bnot\b/.test(a) === (t.mode === "neg");
+  };
+  const blank = t => t.mode === "q"
+    ? `___ ${subjQ(t)} ${compEn(t)}?`
+    : `${t.s.en} ___ ${compEn(t)}.`;
+  const ruleHint = t => {
+    const v = t.s.verb;
+    const neg = { am: "am not", is: "isn't / is not", are: "aren't / are not" }[v];
+    let why;
+    if (t.s.en === "I") why = "I → всегда <b>am</b>";
+    else if (t.s.en === "You") why = "You → всегда <b>are</b>, даже про одного человека";
+    else if (t.s.en.toLowerCase() === t.s.pron) why = `${t.s.en} → <b>${v}</b>`;
+    else why = `«${t.s.en}» = ${t.s.pron} → <b>${v}</b>`;
+    let extra = "";
+    if (t.mode === "neg") extra = `<br>Отрицание: <b>${neg}</b>`;
+    if (t.mode === "q") extra = `<br>В вопросе глагол стоит первым: <b>${cap(v)}</b> ${esc(subjQ(t))} …?`;
+    return why + extra;
+  };
+  const esc = s => s.replace(/[&<>"]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch]));
+
+  // ---------- Статистика ----------
+  const KEY = "tobe-trainer-v1";
+  let stats = {};
+  try { stats = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch { stats = {}; }
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(stats)); } catch {} };
+  const weight = k => 1 + 3 * ((stats[k] && stats[k].w) || 0);
+  const record = (k, ok) => {
+    const s = stats[k] || (stats[k] = { n: 0, e: 0, w: 0 });
+    s.n++;
+    if (ok) s.w *= 0.6; else { s.e++; s.w = Math.min(5, s.w + 1); }
+  };
+
+  // ---------- Генератор ----------
+  const rnd = n => Math.floor(Math.random() * n);
+  const pick = (items, wf) => {
+    const ws = items.map(wf);
+    let r = Math.random() * ws.reduce((a, b) => a + b, 0);
+    for (let i = 0; i < items.length; i++) { r -= ws[i]; if (r <= 0) return items[i]; }
+    return items[items.length - 1];
+  };
+  let turn = 0;
+  const review = [];
+  const recent = [];
+  function next(modes) {
+    turn++;
+    const idx = review.findIndex(r => r.due <= turn && modes.includes(r.t.mode));
+    if (idx >= 0) { const r = review.splice(idx, 1)[0]; return { ...r.t, repeat: true }; }
+    for (let i = 0; i < 60; i++) {
+      const combos = modes.flatMap(m => ["am", "is", "are"].map(v => [m, v]));
+      const [mode, verb] = pick(combos, ([m, v]) => weight(`${m}:${v}`) * (v === "am" ? 0.6 : 1));
+      const subj = pick(subjects.filter(s => s.verb === verb), s => weight("subj:" + s.en));
+      const comps = complements.filter(c => (c.kinds & subj.kind) && !(c.age && subj.kind !== P));
+      if (!comps.length) continue;
+      const c = comps[rnd(comps.length)];
+      const sig = subj.en + "|" + c.sg;
+      if (recent.includes(sig)) continue;
+      recent.push(sig); if (recent.length > 12) recent.shift();
+      return { s: subj, c, mode, age: 7 + rnd(9) };
+    }
+    return { s: subjects[0], c: complements[0], mode: modes[0], age: 10 };
+  }
+
+  // ---------- Интерфейс ----------
+  const $ = id => document.getElementById(id);
+  let modeKey = "all", level = 1;
+  try {
+    const p = JSON.parse(localStorage.getItem("tobe-trainer-prefs") || "{}") || {};
+    if (["all", "pos", "neg", "q"].includes(p.mode)) modeKey = p.mode;
+    if (p.level === 1 || p.level === 2) level = p.level;
+  } catch {}
+  let modes = modeKey === "all" ? ["pos", "neg", "q"] : [modeKey];
+  let task, asked = 0, answered = 0, correct = 0, streak = 0;
+
+  function render() {
+    asked++;
+    $("tNum").textContent = asked;
+    const [sign, label] = MODE_LABEL[task.mode];
+    $("tTag").innerHTML = `<span class="sign">${sign}</span>${label}`;
+    $("taskForm").className = "sheet m-" + task.mode;
+    $("tRepeat").hidden = !task.repeat;
+    const attrs = `autocapitalize="off" autocorrect="off" spellcheck="false" autocomplete="off"`;
+    if (level === 2) {
+      $("tSentence").innerHTML =
+        `<span class="ru-prompt">${esc(ru(task)).replace(/(^|\s)(не)(?=\s)/, '$1<span class="neg-word">$2</span>')}</span>` +
+        `<input class="answer wide" id="answer" aria-label="Перевод на английский" placeholder="Напиши по-английски…" ${attrs}>`;
+      $("hintRu").textContent = blank(task);
+      $("hintBtn").textContent = "Подсказка";
+    } else {
+      const input = `<input class="answer" id="answer" aria-label="Пропущенное слово" placeholder="…" ${attrs}>`;
+      const parts = task.mode === "q"
+        ? [input, `<span>${esc(subjQ(task))} ${esc(compEn(task))}?</span>`]
+        : [`<span>${esc(task.s.en)}</span>`, input, `<span>${esc(compEn(task))}.</span>`];
+      $("tSentence").innerHTML = parts.join("");
+      $("hintRu").textContent = ru(task);
+      $("hintBtn").textContent = "Перевод";
+    }
+    $("hintRu").hidden = true;
+    const inp = $("answer");
+    if (level !== 2) inp.addEventListener("input", () => { inp.style.width = Math.max(6.5, inp.value.length + 1.5) + "ch"; });
+    inp.focus({ preventScroll: true });
+  }
+
+  function showCheck(t, input, ok) {
+    const box = $("check");
+    box.hidden = false;
+    box.className = "check " + (ok ? "ok" : "bad");
+    const main = answers(t)[0];
+    const alts = answers(t).slice(1).filter(a => !a.startsWith("'"));
+    const sentence = t.mode === "q"
+      ? `<mark>${cap(main)}</mark> ${esc(subjQ(t))} ${esc(compEn(t))}?`
+      : `${esc(t.s.en)} <mark>${esc(main)}</mark> ${esc(compEn(t))}.`;
+    if (level === 2) {
+      const also = t.mode === "q" ? [] : answers(t).slice(1).map(a => full(t, a));
+      const vr = !ok && verbRight(t, input);
+      box.innerHTML = ok
+        ? `<div class="verdict">Верно ✓</div>
+           <div class="full">${sentence}</div>
+           ${also.length ? `<div class="ru">Так тоже можно: ${also.map(esc).join(" · ")}</div>` : ""}`
+        : `<div class="verdict">Ошибка ✗</div>
+           <div class="given">Ты написал(а): <s>${esc(input.trim())}</s></div>
+           <div class="full">Правильно: ${sentence}</div>
+           ${vr ? `<div class="rule">Глагол to be стоит верно, ошибка в других словах.</div>` : `<div class="rule">${ruleHint(t)}</div>`}
+           <div class="note">Это предложение попадётся ещё раз через несколько заданий.</div>`;
+      return;
+    }
+    box.innerHTML = ok
+      ? `<div class="verdict">Верно ✓</div>
+         <div class="full">${sentence}</div>
+         <div class="ru"><span class="flag">RU</span><span>${esc(ru(t))}</span></div>`
+      : `<div class="verdict">Ошибка ✗</div>
+         <div class="given">Ты написал(а): <s>${esc(input.trim())}</s> → правильно <b>${esc(main)}</b>${alts.length ? ` (или ${alts.map(esc).join(", ")})` : ""}</div>
+         <div class="full">${sentence}</div>
+         <div class="rule">${ruleHint(t)}</div>
+         <div class="ru"><span class="flag">RU</span><span>${esc(ru(t))}</span></div>
+         <div class="note">Это предложение попадётся ещё раз через несколько заданий.</div>`;
+  }
+
+
+  function renderMap() {
+    const cols = [["pos", "+"], ["neg", "−"], ["q", "?"]];
+    let html = `<tr><th></th>${cols.map(([, s]) => `<th>${s}</th>`).join("")}</tr>`;
+    for (const v of ["am", "is", "are"]) {
+      html += `<tr><th class="row">${v}</th>`;
+      for (const [m] of cols) {
+        const s = stats[`${m}:${v}`];
+        if (!s || !s.n) { html += `<td class="lv0">—<small>нет</small></td>`; continue; }
+        const pct = Math.round(100 * (s.n - s.e) / s.n);
+        const lv = s.w > 1 ? 3 : s.w > 0.3 ? 2 : 1;
+        html += `<td class="lv${lv}">${pct}%<small>${s.n - s.e}/${s.n}</small></td>`;
+      }
+      html += `</tr>`;
+    }
+    $("map").innerHTML = html;
+    const weak = Object.entries(stats)
+      .filter(([k, s]) => k.startsWith("subj:") && s.w > 0.5)
+      .sort((a, b) => b[1].w - a[1].w).slice(0, 5).map(([k]) => k.slice(5));
+    $("weak").innerHTML = weak.length
+      ? `Трудные слова: <b>${weak.map(esc).join(", ")}</b>. Они будут попадаться чаще.`
+      : "Красные клетки — то, что будет попадаться чаще.";
+  }
+
+  function renderScore() {
+    $("sScore").textContent = `${correct}/${answered}`;
+    $("sStreak").textContent = streak;
+  }
+
+  $("taskForm").addEventListener("submit", e => {
+    e.preventDefault();
+    const inp = $("answer");
+    const value = inp.value;
+    if (!value.trim()) { inp.focus(); return; }
+    const ok = check(task, value, level);
+    // если на уровне 2 ошибка не в to be, слабым местом её не считаем
+    const verbOk = ok || (level === 2 && verbRight(task, value));
+    record(`${task.mode}:${task.s.verb}`, verbOk);
+    record("subj:" + task.s.en, verbOk);
+    save();
+    answered++;
+    if (ok) { correct++; streak++; } else { streak = 0; review.push({ due: turn + 3 + rnd(3), t: { s: task.s, c: task.c, mode: task.mode, age: task.age } }); }
+    showCheck(task, value, ok);
+    renderMap(); renderScore();
+    task = next(modes);
+    render();
+    if (window.matchMedia("(max-width: 640px)").matches) $("taskForm").scrollIntoView({ block: "start", behavior: "smooth" });
+  });
+
+  $("hintBtn").addEventListener("click", () => { $("hintRu").hidden = !$("hintRu").hidden; $("answer").focus(); });
+
+  const PREFS = "tobe-trainer-prefs";
+  const savePrefs = () => { try { localStorage.setItem(PREFS, JSON.stringify({ mode: modeKey, level })); } catch {} };
+  const applyChips = () => {
+    document.querySelectorAll("#modes button").forEach(x => x.setAttribute("aria-pressed", String(x.dataset.mode === modeKey)));
+    document.querySelectorAll("#levels button").forEach(x => x.setAttribute("aria-pressed", String(+x.dataset.level === level)));
+    $("lead").textContent = level === 2
+      ? "Переведи предложение на английский целиком. Регистр и точки не важны."
+      : "Впиши am / is / are в пропуск. Ошибки вернутся чуть позже.";
+  };
+  const restart = () => { asked--; task = next(modes); render(); $("check").hidden = true; };
+
+  $("modes").addEventListener("click", e => {
+    const b = e.target.closest("button[data-mode]");
+    if (!b) return;
+    modeKey = b.dataset.mode;
+    modes = modeKey === "all" ? ["pos", "neg", "q"] : [modeKey];
+    applyChips(); savePrefs(); restart();
+  });
+
+  $("levels").addEventListener("click", e => {
+    const b = e.target.closest("button[data-level]");
+    if (!b) return;
+    level = +b.dataset.level;
+    applyChips(); savePrefs(); restart();
+  });
+
+  $("resetBtn").addEventListener("click", () => { $("resetConfirm").hidden = false; $("resetBtn").hidden = true; });
+  $("resetNo").addEventListener("click", () => { $("resetConfirm").hidden = true; $("resetBtn").hidden = false; });
+  $("resetYes").addEventListener("click", () => {
+    stats = {}; save(); renderMap();
+    $("resetConfirm").hidden = true; $("resetBtn").hidden = false;
+  });
+
+  applyChips();
+  task = next(modes);
+  render(); renderMap(); renderScore();
+})();
+</script>
+
+</body>
+</html>
