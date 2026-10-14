@@ -141,10 +141,13 @@ header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content:
 .kbd { font-size: 12px; color: var(--muted); margin-left: auto; }
 
 /* Проверка «красной ручкой» */
-.check { border-radius: 6px; padding: 16px 18px; border: 1px solid var(--line); background: var(--sheet); display: grid; gap: 6px; }
-.check.ok { border-color: var(--ok); background: var(--ok-soft); }
-.check.bad { border-color: var(--pen); background: var(--pen-soft); }
-.verdict { font-family: var(--font-hand); font-size: 30px; font-weight: 700; line-height: 1; }
+/* Экран результата показывается на том же листе, что и задание */
+.sheet.res-ok { --tagc: var(--ok); }
+.sheet.res-bad { --tagc: var(--pen); }
+.check { display: grid; gap: 8px; min-height: 9.5em; align-content: start; }
+.verdict { font-family: var(--font-hand); font-size: 34px; font-weight: 700; line-height: 1; }
+.check .full { font-size: clamp(19px, 4.5vw, 24px); }
+.check .ru { font-size: 17px; }
 .check.ok .verdict { color: var(--ok); }
 .check.bad .verdict { color: var(--pen); }
 .given s { color: var(--pen); text-decoration-thickness: 2px; }
@@ -211,7 +214,7 @@ table.map { width: 100%; border-collapse: separate; border-spacing: 4px; font-va
   .actions .btn { flex: 1 1 0; padding: 12px 10px; font-size: 16px; }
   .hint-ru { flex-basis: 100%; order: 3; }
   .kbd { display: none; }
-  .check { padding: 14px; gap: 4px; }
+  .check { gap: 6px; }
   .verdict { font-size: 26px; }
   .full { font-size: 17px; }
   .rule, .ru { font-size: 14.5px; }
@@ -255,20 +258,27 @@ table.map { width: 100%; border-collapse: separate; border-spacing: 4px; font-va
 
   <form class="sheet" id="taskForm" autocomplete="off">
     <div class="num" id="tNum">1</div>
-    <div class="task-meta">
-      <div class="tag" id="tTag"><span class="sign">+</span>утверждение</div>
-      <div class="repeat" id="tRepeat" hidden>повтор ошибки</div>
+    <div id="taskView">
+      <div class="task-meta">
+        <div class="tag" id="tTag"><span class="sign">+</span>утверждение</div>
+        <div class="repeat" id="tRepeat" hidden>повтор ошибки</div>
+      </div>
+      <div class="sentence" id="tSentence"></div>
+      <div class="actions">
+        <button class="btn" type="submit">Проверить</button>
+        <button class="btn ghost" type="button" id="hintBtn">Перевод</button>
+        <span class="hint-ru" id="hintRu" hidden></span>
+        <span class="kbd">Enter — проверить</span>
+      </div>
     </div>
-    <div class="sentence" id="tSentence"></div>
-    <div class="actions">
-      <button class="btn" type="submit">Проверить</button>
-      <button class="btn ghost" type="button" id="hintBtn">Перевод</button>
-      <span class="hint-ru" id="hintRu" hidden></span>
-      <span class="kbd">Enter — проверить</span>
+    <div id="resultView" hidden aria-live="polite">
+      <div class="check" id="result"></div>
+      <div class="actions">
+        <button class="btn" type="submit" id="nextBtn">Дальше →</button>
+        <span class="kbd">Enter — следующее задание</span>
+      </div>
     </div>
   </form>
-
-  <section class="check" id="check" hidden aria-live="polite"></section>
 
   <div class="stats">
     <section class="panel">
@@ -490,8 +500,13 @@ table.map { width: 100%; border-collapse: separate; border-spacing: 4px; font-va
   } catch {}
   let modes = modeKey === "all" ? ["pos", "neg", "q"] : [modeKey];
   let task, asked = 0, answered = 0, correct = 0, streak = 0;
+  // "task" — ждём ответ, "result" — показываем проверку до нажатия «Дальше»
+  let state = "task", shownAt = 0;
 
   function render() {
+    state = "task";
+    $("taskView").hidden = false;
+    $("resultView").hidden = true;
     asked++;
     $("tNum").textContent = asked;
     const [sign, label] = MODE_LABEL[task.mode];
@@ -521,9 +536,9 @@ table.map { width: 100%; border-collapse: separate; border-spacing: 4px; font-va
   }
 
   function showCheck(t, input, ok) {
-    const box = $("check");
-    box.hidden = false;
+    const box = $("result");
     box.className = "check " + (ok ? "ok" : "bad");
+    $("taskForm").className = "sheet " + (ok ? "res-ok" : "res-bad");
     const main = answers(t)[0];
     const alts = answers(t).slice(1).filter(a => !a.startsWith("'"));
     const sentence = t.mode === "q"
@@ -535,11 +550,13 @@ table.map { width: 100%; border-collapse: separate; border-spacing: 4px; font-va
       box.innerHTML = ok
         ? `<div class="verdict">Верно ✓</div>
            <div class="full">${sentence}</div>
+           <div class="ru"><span class="flag">RU</span><span>${esc(ru(t))}</span></div>
            ${also.length ? `<div class="ru">Так тоже можно: ${also.map(esc).join(" · ")}</div>` : ""}`
         : `<div class="verdict">Ошибка ✗</div>
            <div class="given">Ты написал(а): <s>${esc(input.trim())}</s></div>
            <div class="full">Правильно: ${sentence}</div>
            ${vr ? `<div class="rule">Глагол to be стоит верно, ошибка в других словах.</div>` : `<div class="rule">${ruleHint(t)}</div>`}
+           <div class="ru"><span class="flag">RU</span><span>${esc(ru(t))}</span></div>
            <div class="note">Это предложение попадётся ещё раз через несколько заданий.</div>`;
       return;
     }
@@ -584,8 +601,29 @@ table.map { width: 100%; border-collapse: separate; border-spacing: 4px; font-va
     $("sStreak").textContent = streak;
   }
 
+  const mobile = () => window.matchMedia("(max-width: 640px)").matches;
+
+  function advance() {
+    task = next(modes);
+    render();
+    if (mobile()) $("taskForm").scrollIntoView({ block: "start", behavior: "smooth" });
+  }
+
+  // Enter на экране результата, даже если фокус ушёл с кнопки
+  document.addEventListener("keydown", e => {
+    if (e.key !== "Enter" || state !== "result" || $("taskForm").contains(document.activeElement)) return;
+    if (Date.now() - shownAt < 300) return;
+    e.preventDefault();
+    advance();
+  });
+
   $("taskForm").addEventListener("submit", e => {
     e.preventDefault();
+    if (state === "result") {
+      // защита от того же нажатия Enter, которым отправили ответ
+      if (Date.now() - shownAt >= 300) advance();
+      return;
+    }
     const inp = $("answer");
     const value = inp.value;
     if (!value.trim()) { inp.focus(); return; }
@@ -599,9 +637,12 @@ table.map { width: 100%; border-collapse: separate; border-spacing: 4px; font-va
     if (ok) { correct++; streak++; } else { streak = 0; review.push({ due: turn + 3 + rnd(3), t: { s: task.s, c: task.c, mode: task.mode, age: task.age } }); }
     showCheck(task, value, ok);
     renderMap(); renderScore();
-    task = next(modes);
-    render();
-    if (window.matchMedia("(max-width: 640px)").matches) $("taskForm").scrollIntoView({ block: "start", behavior: "smooth" });
+    state = "result";
+    shownAt = Date.now();
+    $("taskView").hidden = true;
+    $("resultView").hidden = false;
+    $("nextBtn").focus({ preventScroll: true });
+    if (mobile()) $("taskForm").scrollIntoView({ block: "start", behavior: "smooth" });
   });
 
   $("hintBtn").addEventListener("click", () => { $("hintRu").hidden = !$("hintRu").hidden; $("answer").focus(); });
@@ -615,7 +656,7 @@ table.map { width: 100%; border-collapse: separate; border-spacing: 4px; font-va
       ? "Переведи предложение на английский целиком. Регистр и точки не важны."
       : "Впиши am / is / are в пропуск. Ошибки вернутся чуть позже.";
   };
-  const restart = () => { asked--; task = next(modes); render(); $("check").hidden = true; };
+  const restart = () => { if (state === "task") asked--; task = next(modes); render(); };
 
   $("modes").addEventListener("click", e => {
     const b = e.target.closest("button[data-mode]");
